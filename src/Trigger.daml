@@ -11,15 +11,15 @@ import Daml.Trigger
 
 import Model
 
-trigger : Trigger ()
-trigger = Trigger with
+autoApproveTrigger : Trigger ()
+autoApproveTrigger = Trigger with
   initialize = \_acs -> ()
   updateState = \_acs _msg () -> ()
   registeredTemplates = AllInDar
-  rule = autoApprove
+  rule = autoApproveRule
 
-autoApprove : Party -> ACS -> Map CommandId [Command] -> () -> TriggerA ()
-autoApprove boss acs _commandsInFlight () = do
+autoApproveRule : Party -> ACS -> Map CommandId [Command] -> () -> TriggerA ()
+autoApproveRule boss acs _commandsInFlight () = do
   let requests : [(ContractId VacationRequest, VacationRequest)] = getContracts @VacationRequest acs
   let requestsForMe = filter (\(_, request) -> request.vacation.boss == boss) requests
   forA_ requestsForMe $ \(contractId, _) -> do
