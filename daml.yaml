@@ -1,0 +1,15 @@
+sdk-version: 0.13.40
+name: copy-trigger
+source: src
+scenario: Model:setup
+parties:
+  - Alice
+  - Bob
+  - Acme Corporation
+version: 0.0.1
+# trigger-dependencies-begin
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-trigger
+# trigger-dependencies-end

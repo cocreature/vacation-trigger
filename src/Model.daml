@@ -1,0 +1,79 @@
+daml 1.2
+module Model where
+
+import DA.Date qualified as Date
+
+template EmployeeVacationAllocation with
+    employee: Party
+    company: Party
+    boss: Party
+    remainingVacationDays: Int
+  where
+    signatory [employee, company]
+    observer boss
+
+    key employee: Party
+    maintainer key
+
+    nonconsuming choice RequestVacation: ContractId VacationRequest with
+        day: Date
+      controller employee
+      do let vacation = Vacation with
+               employee
+               boss
+               company
+               day
+         create VacationRequest with vacation
+
+template EmployeeProposal with
+    allocation : EmployeeVacationAllocation
+  where
+    signatory allocation.company
+    observer allocation.employee
+
+    choice EmployeeProposal_Accept: ContractId EmployeeVacationAllocation
+      controller allocation.employee
+      do create allocation
+
+template VacationRequest with
+    vacation: Vacation
+  where
+    signatory [vacation.employee, vacation.company]
+    observer vacation.boss
+
+    choice AcceptRequest: ContractId Vacation
+      controller vacation.boss
+      do (allocationId, allocation) <- fetchByKey @EmployeeVacationAllocation vacation.employee
+         assertMsg "No vacation days remaining" (allocation.remainingVacationDays > 0)
+         assertMsg "Mismatching boss in allocation" (allocation.boss == vacation.boss)
+         archive allocationId
+         create allocation with remainingVacationDays = allocation.remainingVacationDays - 1
+         create vacation
+
+template Vacation with
+    employee: Party
+    boss: Party
+    company: Party
+    day: Date
+  where
+    signatory [employee, company, boss]
+
+setup = do
+  company <- getParty "Acme Corporation"
+  boss <- getParty "Alice"
+  employee <- getParty "Bob"
+  let allocation = EmployeeVacationAllocation with
+        employee
+        company
+        boss
+        remainingVacationDays = 30
+  employeeProposal <- submit company $ create EmployeeProposal with allocation
+  submit employee $ exercise employeeProposal EmployeeProposal_Accept
+  pure (company, boss, employee)
+
+test = do
+  (company, boss, employee) <- setup
+  let dayOff = Date.date 2019 Date.Dec 31
+  request <- submit employee $ exerciseByKey @EmployeeVacationAllocation employee (RequestVacation dayOff)
+  submit boss $ exercise request AcceptRequest
+  pure ()

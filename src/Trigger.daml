@@ -1,0 +1,27 @@
+-- Copyright (c) 2019 The DAML Authors. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+daml 1.2
+module Trigger where
+
+import DA.Foldable
+import DA.Next.Map (Map)
+
+import Daml.Trigger
+
+import Model
+
+trigger : Trigger ()
+trigger = Trigger with
+  initialize = \_acs -> ()
+  updateState = \_acs _msg () -> ()
+  registeredTemplates = AllInDar
+  rule = autoApprove
+
+autoApprove : Party -> ACS -> Map CommandId [Command] -> () -> TriggerA ()
+autoApprove boss acs _commandsInFlight () = do
+  let requests : [(ContractId VacationRequest, VacationRequest)] = getContracts @VacationRequest acs
+  let requestsForMe = filter (\(_, request) -> request.vacation.boss == boss) requests
+  forA_ requestsForMe $ \(contractId, _) -> do
+    dedupExercise contractId AcceptRequest
+
